@@ -792,10 +792,7 @@
         <p class="text-slate-400 mt-3 max-w-lg">Open to full-stack, backend, security engineering, and DevSecOps opportunities. Let's talk.</p>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-
-        <!-- Contact info -->
-        <div class="reveal space-y-6">
+      <div class="reveal max-w-sm">
           <a href="https://www.linkedin.com/in/kevin-muirhead-9b69651b2/"
              target="_blank" rel="noopener"
              class="flex items-center gap-4 p-5 rounded-lg border border-white/8 bg-surface-800 card-hover group">
@@ -808,51 +805,6 @@
             </div>
           </a>
         </div>
-
-        <!-- Form -->
-        <div class="reveal reveal-delay-2">
-          <form id="contact-form" class="space-y-4" novalidate>
-            <!-- Honeypot — hidden from users, traps bots -->
-            <input type="text" name="_honey" class="hidden" tabindex="-1" autocomplete="off">
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label for="contact-name" class="block text-xs font-medium text-slate-400 mb-1.5">Name *</label>
-                <input type="text" id="contact-name" name="name" required autocomplete="name"
-                       class="form-input" placeholder="Your name">
-              </div>
-              <div>
-                <label for="contact-email" class="block text-xs font-medium text-slate-400 mb-1.5">Email *</label>
-                <input type="email" id="contact-email" name="email" required autocomplete="email"
-                       class="form-input" placeholder="your@email.com">
-              </div>
-            </div>
-
-            <div>
-              <label for="contact-subject" class="block text-xs font-medium text-slate-400 mb-1.5">Subject</label>
-              <input type="text" id="contact-subject" name="subject"
-                     class="form-input" placeholder="Opportunity, question, etc.">
-            </div>
-
-            <div>
-              <label for="contact-message" class="block text-xs font-medium text-slate-400 mb-1.5">Message *</label>
-              <textarea id="contact-message" name="message" rows="5" required
-                        class="form-input resize-y" placeholder="Tell me what you're working on..."></textarea>
-            </div>
-
-            <button type="submit" id="submit-btn"
-                    class="w-full bg-brand-500 text-white font-semibold py-3 px-6 rounded text-sm hover:bg-brand-600 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2">
-              <span id="submit-text">Send Message</span>
-              <svg id="submit-spinner" class="hidden animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-            </button>
-            <p id="form-feedback" class="text-sm text-center hidden"></p>
-          </form>
-        </div>
-
-      </div>
     </div>
   </section>
 
@@ -916,39 +868,7 @@
     revealEls.forEach(el => revealObserver.observe(el));
 
     // ── Contact form (mailto fallback) ───────────────────────────
-    document.getElementById('contact-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const honey = this.querySelector('[name="_honey"]').value;
-      if (honey) return; // bot trap
 
-      const name    = this.querySelector('[name="name"]').value.trim();
-      const email   = this.querySelector('[name="email"]').value.trim();
-      const subject = this.querySelector('[name="subject"]').value.trim();
-      const message = this.querySelector('[name="message"]').value.trim();
-
-      if (!name || !email || !message) {
-        showFeedback('Please fill in all required fields.', false);
-        return;
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showFeedback('Please enter a valid email address.', false);
-        return;
-      }
-
-      const mailto = `mailto:kevin.j.muirhead@gmail.com`
-        + `?subject=${encodeURIComponent(subject || 'Portfolio Contact')} — from ${encodeURIComponent(name)}`
-        + `&body=${encodeURIComponent(`Name: ${name}\nEmail: ${email}\n\n${message}`)}`;
-      window.location.href = mailto;
-      showFeedback("Opening your mail client...", true);
-    });
-
-    function showFeedback(msg, success) {
-      const el = document.getElementById('form-feedback');
-      el.textContent = msg;
-      el.className = `text-sm text-center ${success ? 'text-brand-400' : 'text-red-400'}`;
-      el.classList.remove('hidden');
-      setTimeout(() => el.classList.add('hidden'), 4000);
-    }
 
     // ── Parallax Canvas ──────────────────────────────────────────
     (function () {
