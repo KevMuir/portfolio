@@ -1,0 +1,64 @@
+name: Scan & Deploy to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # ── Job 1: Security scanning ────────────────────────────────────────────────
+  scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Trivy — filesystem scan for hardcoded secrets and misconfigurations
+      # CodeQL is handled by the separate codeql.yml workflow (GitHub-managed)
+      - name: Run Trivy (secrets + misconfig)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: 1          # Fail the workflow if HIGH/CRITICAL findings exist
+          format: table
+
+  # ── Job 2: Deploy (only runs if scan passes) ────────────────────────────────
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: scan                 # Blocked until scan job succeeds
+    # Only deploy on push to main — not on PRs
+    if: github.event_name != 'pull_request'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "."
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
