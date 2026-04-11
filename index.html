@@ -877,27 +877,36 @@
       const heroEl = document.getElementById('home');
 
       // ── Config ──────────────────────────────────────────────────
-      const POINT_COUNT  = 72;    // drifting vertices
-      const LINK_DIST    = 190;   // px — max edge length
-      const MAX_SPEED    = 0.45;  // px/frame cap
-      const NUDGE        = 0.018; // random velocity nudge per frame (Brownian motion)
-      const SPOTLIGHT_R  = 280;   // px — spotlight radius
+      const POINT_COUNT  = 65;    // vertices in the mesh
+      const LINK_DIST    = 160;   // px — max edge length
+      const HOME_LERP    = 0.07;  // how fast each point's home tracks the mouse (0–1)
+      const NUDGE        = 0.55;  // Brownian offset push per frame
+      const DAMP         = 0.93;  // offset velocity damping per frame
+      const MAX_OFFSET   = 115;   // max drift radius from home position
+      const FADE_R       = 210;   // edge alpha falloff radius from mouse
 
       let W, H, raf;
       let pts = [];
       let mouse  = { x: 0.5, y: 0.5 }; // normalised 0-1
-      let smooth = { x: 0.5, y: 0.5 }; // lerped
+      let smooth = { x: 0.5, y: 0.5 }; // lerped pixel position
 
       function rand(a, b) { return Math.random() * (b - a) + a; }
+      function smoothstep(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
 
       function buildPoints() {
         pts = [];
+        const cx = W * 0.5, cy = H * 0.45;
         for (let i = 0; i < POINT_COUNT; i++) {
+          const angle  = rand(0, Math.PI * 2);
+          const radius = rand(0, MAX_OFFSET);
           pts.push({
-            x:  rand(0, W),
-            y:  rand(0, H),
-            vx: rand(-MAX_SPEED, MAX_SPEED),
-            vy: rand(-MAX_SPEED, MAX_SPEED),
+            homeX: cx, homeY: cy,          // home position — lerps to mouse
+            ox: Math.cos(angle) * radius,  // Brownian offset x from home
+            oy: Math.sin(angle) * radius,  // Brownian offset y from home
+            vox: rand(-0.4, 0.4),          // offset velocity x
+            voy: rand(-0.4, 0.4),          // offset velocity y
+            x: cx + Math.cos(angle) * radius,
+            y: cy + Math.sin(angle) * radius,
           });
         }
       }
@@ -910,56 +919,60 @@
         buildPoints();
       }
 
-      function stepPoints() {
+      function stepPoints(mx, my) {
         pts.forEach(p => {
-          // Brownian nudge — small random push every frame
-          p.vx += rand(-NUDGE, NUDGE);
-          p.vy += rand(-NUDGE, NUDGE);
+          // Home position lerps toward mouse — this makes the cluster follow the cursor
+          p.homeX += (mx - p.homeX) * HOME_LERP;
+          p.homeY += (my - p.homeY) * HOME_LERP;
 
-          // Clamp to max speed
-          const spd = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-          if (spd > MAX_SPEED) { p.vx = p.vx / spd * MAX_SPEED; p.vy = p.vy / spd * MAX_SPEED; }
+          // Brownian drift of the offset — keeps points shifting even at rest
+          p.vox += rand(-NUDGE, NUDGE);
+          p.voy += rand(-NUDGE, NUDGE);
+          p.vox *= DAMP;
+          p.voy *= DAMP;
+          p.ox  += p.vox;
+          p.oy  += p.voy;
 
-          p.x += p.vx;
-          p.y += p.vy;
+          // Soft clamp — nudge offset back if it exceeds MAX_OFFSET radius
+          const om = Math.sqrt(p.ox * p.ox + p.oy * p.oy);
+          if (om > MAX_OFFSET) {
+            const scale = MAX_OFFSET / om;
+            p.ox *= scale; p.oy *= scale;
+            p.vox *= -0.4; p.voy *= -0.4;
+          }
 
-          // Soft bounce — reflect and nudge back inside
-          if (p.x < 0)  { p.x = 0;  p.vx = Math.abs(p.vx); }
-          if (p.x > W)  { p.x = W;  p.vx = -Math.abs(p.vx); }
-          if (p.y < 0)  { p.y = 0;  p.vy = Math.abs(p.vy); }
-          if (p.y > H)  { p.y = H;  p.vy = -Math.abs(p.vy); }
+          p.x = p.homeX + p.ox;
+          p.y = p.homeY + p.oy;
         });
       }
 
       function draw() {
         ctx.clearRect(0, 0, W, H);
 
-        // Move points every frame → always shifting even with stationary mouse
-        stepPoints();
-
-        // Lerp smooth mouse
-        smooth.x += (mouse.x - smooth.x) * 0.05;
-        smooth.y += (mouse.y - smooth.y) * 0.05;
+        // Smooth mouse lerp → pixel coords
+        smooth.x += (mouse.x - smooth.x) * 0.07;
+        smooth.y += (mouse.y - smooth.y) * 0.07;
         const mx = smooth.x * W;
         const my = smooth.y * H;
 
-        // ── Spotlight glow ─────────────────────────────────────────
-        const outer = ctx.createRadialGradient(mx, my, 0, mx, my, SPOTLIGHT_R);
-        outer.addColorStop(0,    'rgba(6,182,212,0.07)');
-        outer.addColorStop(0.35, 'rgba(6,182,212,0.03)');
-        outer.addColorStop(1,    'rgba(0,0,0,0)');
-        ctx.fillStyle = outer;
+        // Step all points (home chases mouse, offsets drift)
+        stepPoints(mx, my);
+
+        // ── Ambient glow at cursor ─────────────────────────────────
+        const glow = ctx.createRadialGradient(mx, my, 0, mx, my, FADE_R * 1.3);
+        glow.addColorStop(0,   'rgba(6,182,212,0.10)');
+        glow.addColorStop(0.4, 'rgba(6,182,212,0.04)');
+        glow.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = glow;
         ctx.fillRect(0, 0, W, H);
 
-        // Tight hot-spot at cursor
-        const inner = ctx.createRadialGradient(mx, my, 0, mx, my, SPOTLIGHT_R * 0.18);
-        inner.addColorStop(0, 'rgba(6,182,212,0.10)');
-        inner.addColorStop(1, 'rgba(6,182,212,0)');
-        ctx.fillStyle = inner;
+        const hot = ctx.createRadialGradient(mx, my, 0, mx, my, FADE_R * 0.18);
+        hot.addColorStop(0, 'rgba(6,182,212,0.14)');
+        hot.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = hot;
         ctx.fillRect(0, 0, W, H);
 
-        // ── Triangulated mesh — edges between nearby points ─────────
-        // Only draw edges whose midpoint falls inside the spotlight
+        // ── Mesh edges ────────────────────────────────────────────
         for (let i = 0; i < pts.length; i++) {
           for (let j = i + 1; j < pts.length; j++) {
             const a = pts[i], b = pts[j];
@@ -967,22 +980,24 @@
             const edgeLen = Math.sqrt(ex * ex + ey * ey);
             if (edgeLen > LINK_DIST) continue;
 
-            // Spotlight falloff at edge midpoint
+            // Fade based on midpoint distance from mouse
             const midX = (a.x + b.x) * 0.5;
             const midY = (a.y + b.y) * 0.5;
             const sdx  = midX - mx, sdy = midY - my;
             const sd   = Math.sqrt(sdx * sdx + sdy * sdy);
-            const raw  = 1 - sd / SPOTLIGHT_R;
-            if (raw <= 0) continue;
-            const lit  = raw * raw * (3 - 2 * raw); // smoothstep
+            const lit  = smoothstep(1 - sd / FADE_R);
+            if (lit < 0.02) continue;
 
-            // Cyan → violet shift toward spotlight edge
+            const edgeFade = 1 - edgeLen / LINK_DIST;
+            const alpha = lit * edgeFade * 0.80;
+
+            // Cyan (#06b6d4) → violet (#8b5cf6) as lit fades toward edge
             const r  = Math.round(6   + (139 - 6)   * (1 - lit));
             const g  = Math.round(182 + (92  - 182)  * (1 - lit));
             const bv = Math.round(212 + (246 - 212)  * (1 - lit));
 
-            ctx.strokeStyle = `rgba(${r},${g},${bv},${0.08 + lit * 0.65})`;
-            ctx.lineWidth   = 0.5 + lit * 0.9;
+            ctx.strokeStyle = `rgba(${r},${g},${bv},${alpha.toFixed(3)})`;
+            ctx.lineWidth   = 0.5 + lit * 1.1;
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
@@ -990,14 +1005,14 @@
           }
         }
 
-        // Vertex dots inside spotlight
+        // ── Vertex dots ───────────────────────────────────────────
         pts.forEach(p => {
           const sdx = p.x - mx, sdy = p.y - my;
-          const lit = Math.max(0, 1 - Math.sqrt(sdx*sdx + sdy*sdy) / SPOTLIGHT_R);
-          if (lit < 0.15) return;
+          const lit = Math.max(0, 1 - Math.sqrt(sdx * sdx + sdy * sdy) / FADE_R);
+          if (lit < 0.08) return;
           ctx.beginPath();
-          ctx.arc(p.x, p.y, 1.2 * lit, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(6,182,212,${lit * 0.7})`;
+          ctx.arc(p.x, p.y, 1.5 * lit, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(6,182,212,${(lit * 0.85).toFixed(3)})`;
           ctx.fill();
         });
 
