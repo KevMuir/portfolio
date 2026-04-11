@@ -880,9 +880,9 @@
       const POINT_COUNT  = 38;    // vertices in the mesh
       const LINK_DIST    = 130;   // px — max edge length
       const HOME_LERP    = 0.04;  // how fast each point's home tracks the mouse (0–1)
-      const NUDGE        = 0.22;  // Brownian offset push per frame
-      const DAMP         = 0.95;  // offset velocity damping per frame
-      const MAX_OFFSET   = 115;   // max drift radius from home position
+      const NUDGE        = 0.16;  // Brownian offset push per frame
+      const DAMP         = 0.96;  // offset velocity damping per frame
+      const MAX_OFFSET   = 115;   // base drift radius — each point gets its own random cap up to 2×
       const FADE_R       = 210;   // edge alpha falloff radius from mouse
 
       let W, H, raf;
@@ -897,14 +897,16 @@
         pts = [];
         const cx = W * 0.5, cy = H * 0.45;
         for (let i = 0; i < POINT_COUNT; i++) {
+          const cap    = rand(MAX_OFFSET * 0.48, MAX_OFFSET * 2); // each point's personal orbit cap
           const angle  = rand(0, Math.PI * 2);
-          const radius = rand(0, MAX_OFFSET);
+          const radius = rand(0, cap);
           pts.push({
             homeX: cx, homeY: cy,          // home position — lerps to mouse
             ox: Math.cos(angle) * radius,  // Brownian offset x from home
             oy: Math.sin(angle) * radius,  // Brownian offset y from home
-            vox: rand(-0.4, 0.4),          // offset velocity x
-            voy: rand(-0.4, 0.4),          // offset velocity y
+            vox: rand(-0.3, 0.3),          // offset velocity x
+            voy: rand(-0.3, 0.3),          // offset velocity y
+            cap,                           // this point's personal max offset radius
             x: cx + Math.cos(angle) * radius,
             y: cy + Math.sin(angle) * radius,
           });
@@ -933,10 +935,10 @@
           p.ox  += p.vox;
           p.oy  += p.voy;
 
-          // Soft clamp — nudge offset back if it exceeds MAX_OFFSET radius
+          // Soft clamp — nudge offset back if it exceeds this point's personal cap
           const om = Math.sqrt(p.ox * p.ox + p.oy * p.oy);
-          if (om > MAX_OFFSET) {
-            const scale = MAX_OFFSET / om;
+          if (om > p.cap) {
+            const scale = p.cap / om;
             p.ox *= scale; p.oy *= scale;
             p.vox *= -0.4; p.voy *= -0.4;
           }
