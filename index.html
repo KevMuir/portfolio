@@ -190,6 +190,10 @@
     #mobile-menu.open {
       display: flex;
     }
+    #nav.menu-open {
+      background: #05080f !important;
+      box-shadow: 0 1px 0 rgba(6,182,212,0.10);
+    }
   </style>
 </head>
 
@@ -844,6 +848,7 @@
     hamburger.addEventListener('click', () => {
       menuOpen = !menuOpen;
       mobileMenu.classList.toggle('open', menuOpen);
+      document.getElementById('nav').classList.toggle('menu-open', menuOpen);
       hamIcon.classList.toggle('hidden', menuOpen);
       closeIcon.classList.toggle('hidden', !menuOpen);
     });
@@ -851,6 +856,7 @@
     function closeMobileMenu() {
       menuOpen = false;
       mobileMenu.classList.remove('open');
+      document.getElementById('nav').classList.remove('menu-open');
       hamIcon.classList.remove('hidden');
       closeIcon.classList.add('hidden');
     }
